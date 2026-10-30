@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#1f8a4c" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Study App" />
+    <title>Study App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Katibeh&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; direction: ltr; }
+        .container { max-width: 900px; margin: 2rem auto; padding: 2rem; background: rgba(255,255,255,0.96); border-radius:12px; box-shadow:0 6px 18px rgba(2,6,23,0.06); position: relative; z-index:10; }
+        .background-image { position: fixed; top:0; left:0; width:100%; height:100%; background-image:url('https://upload.wikimedia.org/wikipedia/commons/e/e0/Human_heart_poster.jpg'); background-size:cover; background-position:center; opacity:0.06; z-index:1; }
+        .loading-spinner { border: 4px solid rgba(0,0,0,0.08); width: 36px; height: 36px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin {0%{transform:rotate(0deg);}100%{transform:rotate(360deg);} }
+        #chat-messages { display:flex; flex-direction:column; gap:0.6rem; padding:0.5rem; max-height:20rem; overflow-y:auto; }
+        .chat-message { padding:12px 16px; border-radius:16px; max-width:72%; word-break:break-word; white-space:pre-wrap; box-shadow:0 6px 18px rgba(15,23,42,0.04); line-height:1.6; font-family: 'Times New Roman', Times, serif; font-size: 1.1rem; }
+        .chat-message.user { background: linear-gradient(135deg,#2563eb 0%,#3b82f6 100%); color:#fff; align-self:flex-end; border-radius:18px 18px 4px 18px; box-shadow:0 8px 30px rgba(59,130,246,0.18); font-weight:600; font-size:0.95rem; }
+        .chat-message.model { background:#fff; color:#0f172a; align-self:flex-start; border-radius:18px 18px 18px 4px; box-shadow:0 8px 30px rgba(99,102,241,0.08); border:1px solid rgba(15,23,42,0.04); font-weight:500; font-size:1.1rem; }
+        .typing-cursor { display:inline-block; width:8px; height:1.05em; margin-left:6px; vertical-align:middle; background:#0f172a; border-radius:2px; animation: blink 1s steps(2,end) infinite; }
+        @keyframes blink { 0%,50% { opacity:1 } 51%,100% { opacity:0 } }
+        @media (max-width:640px) {
+            .container { margin:1rem; padding:1rem; }
+            .chat-message { font-size:1.05rem; max-width:86%; }
+            .chat-message.user { font-size:0.92rem; }
+        }
+        .mcq-question, .saq-question { margin-bottom: 1.5rem; padding: 1rem; background-color: white; border-radius: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .mcq-option { display: block; width: 100%; text-align: left; padding: 0.75rem; margin-bottom: 0.5rem; border: 1px solid #e5e7eb; border-radius: 0.375rem; cursor: pointer; transition: all 0.2s; }
+        .mcq-option:hover { background-color: #f3f4f6; }
+        .mcq-option:disabled { opacity: 0.6; cursor: not-allowed; }
+        .correct-answer { color: #059669; font-weight: bold; margin-top: 0.5rem; }
+        .wrong-answer { color: #dc2626; font-weight: bold; margin-top: 0.5rem; }
+        .saq-answer-btn { background-color: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 500; }
+        .saq-answer-btn:hover { background-color: #2563eb; }
+        .saq-answer { margin-top: 1rem; padding: 1rem; background-color: #f0f9ff; border-left: 4px solid #3b82f6; border-radius: 0.375rem; }
+        .flashcard { margin-bottom: 1.5rem; padding: 1.2rem; background-color: white; border-radius: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 4px solid #3b82f6; }
+        .flashcard-question { font-weight: 700; color: #1e40af; font-size: 1.1rem; margin-bottom: 0.8rem; line-height: 1.6; }
+        .flashcard-answer { color: #4b5563; font-size: 1rem; line-height: 1.7; padding-left: 0.5rem; border-left: 2px solid #e5e7eb; }
+        #result-text h1 { font-size: 1.75rem; font-weight: 700; color: #1e40af; margin: 1.5rem 0 0.8rem 0; }
+        #result-text h2 { font-size: 1.5rem; font-weight: 700; color: #1e40af; margin: 1.3rem 0 0.7rem 0; }
+        #result-text h3 { font-size: 1.3rem; font-weight: 600; color: #1e40af; margin: 1.2rem 0 0.6rem 0; }
+        #result-text h4, #result-text h5, #result-text h6 { font-weight: 600; color: #1e40af; margin: 1rem 0 0.5rem 0; }
+        #result-text p { margin-bottom: 0.8rem; line-height: 1.7; }
+        #result-text ul, #result-text ol { margin: 0.8rem 0; padding-left: 1.5rem; }
+        #result-text li { margin-bottom: 0.4rem; }
+        #result-text blockquote { border-left: 4px solid #3b82f6; padding-left: 1rem; margin: 1rem 0; color: #4b5563; font-style: italic; }
+        #explanation-result { max-height: none; overflow-y: visible; min-height: 80px; transition: all 0.3s ease; padding: 1.8rem; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 14px; border: 1px solid #e2e8f0; box-shadow: 0 6px 18px rgba(2,6,23,0.06); }
+        #explanation-text { font-family: 'Times New Roman', Times, serif; font-size: 1.2rem; line-height: 1.9; white-space: pre-wrap; color: #334155; min-height: 52px; }
+        .explanation-status { font-size: 0.95rem; color: #6b7280; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+        .expansion-highlight { background: linear-gradient(120deg, #eef2ff 0%, #e0f2fe 100%); padding: 0.9rem 1rem; border-radius: 10px; border-left: 4px solid #2563eb; margin-bottom: 0.9rem; font-weight: 700; color: #0f172a; font-size: 1.18rem; }
+        .explanation-key-points { margin-top: 0.8rem; padding-left: 1.2rem; }
+        .explanation-key-points li { margin-bottom: 0.45rem; position: relative; padding-left: 0.5rem; }
+        .explanation-key-points li:before { content: "•"; color: #2563eb; font-weight: bold; display: inline-block; width: 1em; margin-left: -1em; }
+        .beautiful-input { padding: 0.875rem 1.25rem; border-radius: 12px; border: 2px solid #e2e8f0; transition: all 0.3s ease; font-size: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .beautiful-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+        .beautiful-btn { padding: 0.875rem 1.75rem; border-radius: 12px; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; cursor: pointer; }
+        .beautiful-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+        .beautiful-btn:active { transform: translateY(0); }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; }
+        .btn-primary:hover { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .btn-success:hover { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
+        .btn-danger:hover { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); }
+        .ocr-progress { margin-top: 1rem; padding: 1rem; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .progress-bar { height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden; margin: 0.5rem 0; }
+        .progress-fill { height: 100%; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 4px; transition: width 0.3s ease; }
+        .progress-text { font-size: 0.875rem; color: #64748b; text-align: center; }
+        .compact-explanation { background: white; border-radius: 12px; padding: 1.2rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); margin-bottom: 1rem; border-left: 4px solid #3b82f6; }
+        .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; width: 100%; }
+        .file-input-wrapper input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .hidden { display: none !important; }
+        .comparison-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 1.1rem; font-family: 'Times New Roman', Times, serif; direction: ltr; text-align: left; }
+        .comparison-table th, .comparison-table td { border: 1px solid #e5e7eb; padding: 0.75rem; text-align: left; vertical-align: top; }
+        .comparison-table th { background-color: #f8fafc; font-weight: 600; color: #1e40af; }
+        .comparison-table tr:nth-child(even) { background-color: #f9fafb; }
+        .explanation-ar-content { direction: rtl; text-align: right; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 1.35rem; line-height: 1.9; white-space: pre-wrap; }
+        .explanation-ar-content h1, .explanation-ar-content h2, .explanation-ar-content h3, .explanation-ar-content h4, .explanation-ar-content h5, .explanation-ar-content h6 { color: #1e40af; margin-top: 1.5rem; margin-bottom: 0.8rem; font-weight: 700; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .explanation-ar-content p { color: #0f172a; margin-bottom: 1rem; line-height: 1.7; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .explanation-ar-content strong { font-weight: 700; }
+        .explanation-ar-content .comparison-table { direction: rtl; text-align: right; }
+        .explanation-ar-content .comparison-table th, .explanation-ar-content .comparison-table td { text-align: right; }
+
+        .progress-fill.indeterminate{width:100%!important;background:linear-gradient(90deg,#3b82f6 25%,#93c5fd 50%,#3b82f6 75%);background-size:200% 100%;animation:shimmer 1.2s linear infinite}
+        @keyframes shimmer{to{background-position:-200% 0}}
+        .quiz-head{display:flex;justify-content:space-between;font-size:.85rem;opacity:.8;margin-bottom:6px}
+        .quiz-bar{height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-bottom:14px}
+        .quiz-bar>div{height:100%;background:#3b82f6;transition:width .3s}
+        .quiz-q{font-weight:700;font-size:1.05rem;margin-bottom:12px}
+        .quiz-opt{display:block;width:100%;text-align:left;padding:11px 14px;margin:8px 0;border:2px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;cursor:pointer;transition:.15s}
+        .quiz-opt:hover:not(:disabled){border-color:#3b82f6;background:#eff6ff}
+        .quiz-opt.correct{border-color:#16a34a!important;background:#dcfce7!important;color:#14532d!important}
+        .quiz-opt.wrong{border-color:#dc2626!important;background:#fee2e2!important;color:#7f1d1d!important}
+        .quiz-score{font-size:2.2rem;font-weight:800;text-align:center;margin:6px 0}
+        .quiz-wrong{border:1px solid #fecaca;background:#fff7f7;border-radius:10px;padding:12px;margin:10px 0;color:#0f172a}
+        .fc-scene{perspective:1000px;cursor:pointer;margin:10px 0}
+        .fc-in{display:grid;transition:transform .5s;transform-style:preserve-3d;min-height:190px}
+        .fc-scene.flipped .fc-in{transform:rotateY(180deg)}
+        .fc-f,.fc-b{grid-area:1/1;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px;border-radius:14px;font-size:1.1rem;box-shadow:0 6px 18px rgba(2,6,23,.12)}
+        .fc-f{background:#eff6ff;border:2px solid #93c5fd;color:#0f172a}
+        .fc-b{background:#f0fdf4;border:2px solid #86efac;color:#0f172a;transform:rotateY(180deg)}
+        .fc-row{display:flex;gap:10px;margin-top:10px}.fc-row button{flex:1}
+        #settings-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px}
+        #settings-modal.hidden{display:none}
+        .modal-card{background:#fff;color:#0f172a;border-radius:14px;padding:20px;width:100%;max-width:380px;text-align:left}
+        .modal-card label{display:block;font-size:.85rem;font-weight:600;margin:12px 0 4px}
+        body.dark{background:#0b1220!important;color:#e2e8f0}
+        body.dark .container{background:rgba(15,23,42,.97)!important;color:#e2e8f0}
+        body.dark .background-image{opacity:.06}
+        body.dark .beautiful-input,body.dark select,body.dark input[type=text],body.dark input[type=number]{background:#1e293b!important;color:#e2e8f0!important;border-color:#334155!important}
+        body.dark .bg-gray-50,body.dark .bg-white,body.dark .bg-gray-100{background:#1e293b!important}
+        body.dark .text-gray-800,body.dark .text-gray-700,body.dark .text-gray-600,body.dark .text-gray-500{color:#e2e8f0!important}
+        body.dark .border,body.dark .border-gray-300,body.dark .border-2{border-color:#334155!important}
+        body.dark .bg-blue-50{background:#1e3a5f!important}body.dark .text-blue-700{color:#93c5fd!important}
+        body.dark .chat-message.model{background:#1e293b;color:#e2e8f0}
+        body.dark .comparison-table th,body.dark .comparison-table td,body.dark table th,body.dark table td{background:#1e293b!important;color:#e2e8f0!important;border-color:#334155!important}
+        body.dark .quiz-bar{background:#334155}
+        body.dark .quiz-opt{background:#1e293b;color:#e2e8f0;border-color:#475569}
+        body.dark .quiz-opt:hover:not(:disabled){background:#27385a}
+        body.dark .quiz-opt.correct{background:#14532d!important;color:#dcfce7!important}
+        body.dark .quiz-opt.wrong{background:#7f1d1d!important;color:#fee2e2!important}
+        body.dark .quiz-wrong{background:#2a1a1f;border-color:#7f1d1d;color:#e2e8f0}
+        body.dark .fc-f{background:#1e3a5f;color:#e2e8f0;border-color:#3b82f6}
+        body.dark .fc-b{background:#14532d;color:#e2e8f0;border-color:#22c55e}
+        body.dark .modal-card{background:#1e293b;color:#e2e8f0}
+
+        body{padding-top:calc(env(safe-area-inset-top,0px) + 2.3rem)!important}
+        #tawfiq{position:absolute;top:calc(env(safe-area-inset-top,0px) + 4px);right:16px;z-index:5;font-family:'Katibeh','Aref Ruqaa','Amiri',serif;font-size:1.3rem;line-height:1.4;color:#166534;background:linear-gradient(90deg,#166534,#a16207);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;user-select:none;pointer-events:none;white-space:nowrap}
+        body.dark #tawfiq{color:#86efac;background:linear-gradient(90deg,#86efac,#fde68a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    </style>
+</head>
+<body class="bg-gray-100 flex items-start justify-center min-h-screen p-4 relative">
+    <div class="background-image"></div>
+    <div id="tawfiq" dir="rtl" lang="ar">وما توفيقي إلا بالله</div>
+    <div class="container text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Study App</h1>
+        <div id="drop-area" class="mb-4 p-5 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 relative">
+            <div class="file-input-wrapper">
+                <input type="file" id="pdf-file-input" accept="application/pdf,.pdf"/>
+            </div>
+            <p class="text-gray-500"><span class="font-bold text-blue-500">Drag & Drop file here</span> or click to upload</p>
+            <p id="file-name" class="text-sm text-gray-600 mt-2"></p>
+        </div>
+        <div class="mb-4 flex space-x-3 items-end">
+            <div class="flex-1">
+                <label for="task-select" class="block text-left text-sm font-medium text-gray-700 mb-1">Select Task</label>
+                <select id="task-select" class="w-full beautiful-input">
+                    <option value="summary">Summary</option>
+                    <option value="mcq">Multiple Choice Questions (MCQ)</option>
+                    <option value="saq">Short Answer Questions (SAQ)</option>
+                    <option value="highlights">Key Highlights</option>
+                    <option value="flashcards">Flashcards</option>
+                    <option value="explanation-ar">Explanation in Arabic</option>
+                    <option value="comparison">Compare Concepts</option>
+                </select>
+            </div>
+            <div id="mcq-input-container" class="flex-1 hidden">
+                <label for="mcq-count" class="block text-left text-sm font-medium text-gray-700 mb-1">Number of Questions</label>
+                <input type="number" id="mcq-count" value="5" min="1" max="20" class="w-full beautiful-input"/>
+            </div>
+            <div id="saq-input-container" class="flex-1 hidden">
+                <label for="saq-count" class="block text-left text-sm font-medium text-gray-700 mb-1">Number of Questions</label>
+                <input type="number" id="saq-count" value="5" min="1" max="20" class="w-full beautiful-input"/>
+            </div>
+            <div id="comparison-input-container" class="flex-1 hidden">
+                <label for="comparison-terms" class="block text-left text-sm font-medium text-gray-700 mb-1">Concepts to Compare</label>
+                <input type="text" id="comparison-terms" placeholder="Enter terms separated by vs or comma" class="w-full beautiful-input"/>
+            </div>
+        </div>
+        <div class="mb-4 flex items-center">
+            <input type="checkbox" id="skip-intro" checked class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <label for="skip-intro" class="text-sm text-gray-700">Skip introductory content (professor info, dates, etc.)</label>
+        </div>
+        <div class="mb-4 flex items-center">
+            <input type="checkbox" id="use-ocr" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <label for="use-ocr" class="text-sm text-gray-700">Use OCR for image-based text extraction (recommended for scanned PDFs)</label>
+        </div>
+        <div id="opts-row" class="mb-4 flex space-x-3 items-end">
+            <div id="from-box" class="flex-1">
+                <label for="page-from" class="block text-left text-sm font-medium text-gray-700 mb-1">From page (optional)</label>
+                <input type="number" id="page-from" min="1" placeholder="1" class="w-full beautiful-input"/>
+            </div>
+            <div id="to-box" class="flex-1">
+                <label for="page-to" class="block text-left text-sm font-medium text-gray-700 mb-1">To page (optional)</label>
+                <input type="number" id="page-to" min="1" placeholder="last" class="w-full beautiful-input"/>
+            </div>
+            <div id="diff-container" class="flex-1 hidden">
+                <label for="difficulty-select" class="block text-left text-sm font-medium text-gray-700 mb-1">Difficulty</label>
+                <select id="difficulty-select" class="w-full beautiful-input">
+                    <option value="mixed">Mixed</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
+                </select>
+            </div>
+        </div>
+        <button id="process-button" class="w-full beautiful-btn btn-primary mb-3">Process</button>
+        <div id="loading-area" class="flex justify-center items-center mt-2 hidden"><div class="loading-spinner"></div><p class="ml-3 text-blue-600 font-medium">Processing...</p></div>
+        <div id="ocr-progress" class="ocr-progress hidden">
+            <p class="progress-text" id="ocr-status">Extracting text from images...</p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="ocr-progress-bar" style="width: 0%"></div>
+            </div>
+            <p class="progress-text" id="ocr-page-info">Page 0 of 0</p>
+        </div>
+        <div id="result-area" class="mt-4 text-left bg-gray-50 p-4 rounded-lg border hidden">
+            <div id="result-text" class="whitespace-pre-wrap"></div>
+        </div>
+        <button id="download-pdf-btn" class="w-full beautiful-btn btn-primary mt-3 hidden">Download</button>
+        <div id="translate-row" class="hidden mt-3"><button id="translate-btn" class="w-full beautiful-btn btn-success"></button></div>
+        <div class="mt-6 pt-6 border-t border-gray-200">
+            <h2 class="text-xl font-bold text-gray-700 mb-4">Instant Explanation</h2>
+            <div class="flex space-x-2">
+                <input id="explanation-input" type="text" placeholder="Enter a term or concept..." class="flex-1 beautiful-input" dir="auto"/>
+                <button id="explain-button" class="beautiful-btn btn-success">Explain</button>
+            </div>
+            <div id="explanation-result" class="mt-4 text-left hidden">
+                <div id="explanation-text" class="whitespace-pre-wrap"></div>
+                <div id="explanation-status" class="explanation-status hidden">
+                    <div class="loading-spinner"></div>
+                    <span>Generating concise explanation...</span>
+                </div>
+            </div>
+        </div>
+        <div id="chat-container" class="mt-6 bg-gray-50 rounded-lg border hidden">
+            <h2 class="text-xl font-bold text-gray-700 p-4 border-b">Chat with the AI</h2>
+            <div id="chat-messages" class="p-4 h-80 overflow-y-auto"></div>
+            <div class="p-4 flex space-x-2 border-t">
+                <input id="chat-input" type="text" placeholder="Type your message..." class="flex-1 beautiful-input" dir="auto"/>
+                <button id="send-button" class="beautiful-btn btn-primary">Send</button>
+                <button id="stop-button" class="beautiful-btn btn-danger hidden">Stop</button>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script>
+        // gemini-2.5-flash was shut down by Google on Oct 16, 2026. Flash-Lite is the fastest current model.
+        const ALL_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"];
+        const S = { model: "gemini-3.5-flash-lite", thinking: "low", dark: false };
+        try { S.dark = window.matchMedia('(prefers-color-scheme: dark)').matches; Object.assign(S, JSON.parse(localStorage.getItem('study_settings') || '{}')); } catch (e) {}
+        if (!ALL_MODELS.includes(S.model)) S.model = ALL_MODELS[0];
+        let GEMINI_MODEL = S.model;
+        function saveSettings() { try { localStorage.setItem('study_settings', JSON.stringify(S)); } catch (e) {} }
+        function thinkingFor(model) { return (S.thinking === 'minimal' && !/lite/.test(model)) ? 'low' : S.thinking; }
+        const GEN_CONFIG = {}; // thinking level is set per model below
+        function optionsFor(model, options, noThinking) {
+            try {
+                const body = JSON.parse(options.body);
+                body.generationConfig = { ...(body.generationConfig || {}) };
+                if (noThinking) delete body.generationConfig.thinkingConfig;
+                else body.generationConfig.thinkingConfig = { thinkingLevel: thinkingFor(model) };
+                return { ...options, body: JSON.stringify(body) };
+            } catch (e) { return options; }
+        }
+        async function geminiFetch(url, options) {
+            if (!apiKey && !askForApiKey()) throw new Error("API key is required. Tap the 🔑 button to add it.");
+            const models = [GEMINI_MODEL, ...ALL_MODELS.filter(m => m !== GEMINI_MODEL)];
+            let response;
+            for (const model of models) {
+                let noThinking = false;
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    const modelUrl = url.replace(/models\/[^:]+:/, `models/${model}:`).replace(/key=[^&]*/, `key=${encodeURIComponent(apiKey)}`);
+                    response = await fetch(modelUrl, optionsFor(model, options, noThinking));
+                    if (response.status === 400 || response.status === 403) {
+                        const body = await response.clone().text();
+                        if (/API key not valid|API_KEY_INVALID|PERMISSION_DENIED|leaked/i.test(body)) {
+                            try { localStorage.removeItem('gemini_api_key'); } catch (e) {}
+                            apiKey = "";
+                            if (askForApiKey("The saved API key was rejected by Google. Paste a new Gemini API key (AIza...):")) { attempt--; continue; }
+                            return response;
+                        }
+                        if (!noThinking && /thinking/i.test(body)) { noThinking = true; attempt--; continue; }
+                    }
+                    if (response.status === 404) break; // model not available -> next model
+                    if (![429, 500, 503].includes(response.status)) return response;
+                    await new Promise(r => setTimeout(r, 700));
+                }
+            }
+            return response;
+        }
+        // API key is NOT stored in the code anymore. It is entered once on each device and kept in that device's localStorage.
+        let apiKey = "";
+        try { apiKey = localStorage.getItem('gemini_api_key') || ""; } catch (e) {}
+        function askForApiKey(message) {
+            const entered = window.prompt(message || "Paste your Gemini API key (starts with AIza...). It is saved only on this device:", "");
+            if (entered && entered.trim()) {
+                apiKey = entered.trim();
+                try { localStorage.setItem('gemini_api_key', apiKey); } catch (e) {}
+                return true;
+            }
+            return false;
+        }
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+        // DOM
+        const fileInput = document.getElementById('pdf-file-input');
+        const dropArea = document.getElementById('drop-area');
+        const fileNameDisplay = document.getElementById('file-name');
+        const taskSelect = document.getElementById('task-select');
+        const mcqInputContainer = document.getElementById('mcq-input-container');
+        const saqInputContainer = document.getElementById('saq-input-container');
+        const comparisonInputContainer = document.getElementById('comparison-input-container');
+        const mcqCountInput = document.getElementById('mcq-count');
+        const saqCountInput = document.getElementById('saq-count');
+        const comparisonTermsInput = document.getElementById('comparison-terms');
+        const processButton = document.getElementById('process-button');
+        const loadingArea = document.getElementById('loading-area');
+        const resultArea = document.getElementById('result-area');
+        const resultText = document.getElementById('result-text');
+        const chatContainer = document.getElementById('chat-container');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendButton = document.getElementById('send-button');
+        const stopButton = document.getElementById('stop-button');
+        const explainButton = document.getElementById('explain-button');
+        const explanationInput = document.getElementById('explanation-input');
+        const explanationResult = document.getElementById('explanation-result');
+        const explanationText = document.getElementById('explanation-text');
+        const explanationStatus = document.getElementById('explanation-status');
+        const skipIntroCheckbox = document.getElementById('skip-intro');
+        const useOcrCheckbox = document.getElementById('use-ocr');
+        const ocrProgress = document.getElementById('ocr-progress');
+        const ocrStatus = document.getElementById('ocr-status');
+        const ocrProgressBar = document.getElementById('ocr-progress-bar');
+        const ocrPageInfo = document.getElementById('ocr-page-info');
+        const downloadPdfBtn = document.getElementById('download-pdf-btn');
+        // state
+        let fileContent = "";
+        let chatHistory = [];
+        let isProcessing = false;
+        let isTyping = false;
+        let abortController = null;
+        let isTypingAnimation = false;
+        let typingTimeoutIds = [];
+        let typingElement = null;
+        let typingText = '';
+        let typingIndex = 0;
+
+        // ✅ دالة الكشف عن النص العربي (RTL)
+        function isArabicText(text) {
+            const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+            return arabicPattern.test(text);
+        }
+
+        // ✅ Add missing typeIntoElement function
+        async function typeIntoElement(element, text, speed = 18) {
+            element.textContent = '';
+            for (let i = 0; i < text.length; i++) {
+                element.textContent += text[i];
+                await new Promise(resolve => setTimeout(resolve, speed));
+            }
+        }
+
+        // ✅ Add expansions object for acronyms
+        const expansions = {
+            "T3": "Triiodothyronine",
+            "T4": "Thyroxine",
+            "TSH": "Thyroid Stimulating Hormone",
+            "FT4": "Free Thyroxine",
+            "TFT": "Thyroid Function Test",
+            "HPT": "Hypothalamic-Pituitary-Thyroid",
+            "TRH": "Thyrotropin-Releasing Hormone",
+            "TRE": "Thyroid Response Element",
+            "DIO2": "Type 2 Deiodinase",
+            "RT3": "Reverse T3",
+            "TBG": "Thyroxine-Binding Globulin",
+            "TPO": "Thyroid Peroxidase",
+            "TG": "Thyroglobulin",
+            "TSHR": "Thyroid Stimulating Hormone Receptor",
+            "TRAbs": "Thyrotropin Receptor Antibodies",
+            "TAB": "Thyroid Autoantibodies",
+            "TNF": "Tumor Necrosis Factor",
+            "IL": "Interleukin",
+            "IFN": "Interferon",
+            "GD": "Graves' Disease",
+            "HT": "Hashimoto's Thyroiditis",
+            "TAO": "Thyroid-Associated Orbitopathy",
+            "TFTs": "Thyroid Function Tests"
+        };
+
+        function toTitleCase(str) {
+            return str.replace(/\w\S*/g, function(txt) {
+                return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+            });
+        }
+
+        function cleanModelText(text) {
+            return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').trim();
+        }
+
+        // ✅ Append user message instantly (مع دعم العربية)
+        function appendMessage(role, text) {
+            try {
+                const div = document.createElement('div');
+                div.classList.add('chat-message');
+                
+                // ضبط المحاذاة والاتجاه حسب اللغة
+                if (isArabicText(text)) {
+                    div.style.direction = 'rtl';
+                    div.style.textAlign = 'right';
+                } else {
+                    div.style.direction = 'ltr';
+                    div.style.textAlign = 'left';
+                }
+
+                if (role === 'user') {
+                    div.classList.add('user');
+                    div.style.alignSelf = 'flex-end';
+                    div.textContent = text.trim();
+                } else {
+                    div.classList.add('model');
+                    div.style.alignSelf = 'flex-start';
+                    div.textContent = text.trim();
+                }
+                chatMessages.appendChild(div);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } catch(e) { console.error('appendMessage error:', e); }
+        }
+
+        // ✅ Append AI message with typing animation (مع دعم العربية)
+        function appendModelTyping(fullText) {
+            return new Promise((resolve) => {
+                isTypingAnimation = true;
+                isTyping = true;
+                
+                stopButton.classList.remove('hidden');
+                sendButton.classList.add('hidden');
+                
+                const div = document.createElement('div');
+                div.classList.add('chat-message','model');
+                div.style.alignSelf = 'flex-start';
+                
+                // ضبط الاتجاه والمحاذاة حسب اللغة
+                if (isArabicText(fullText)) {
+                    div.style.direction = 'rtl';
+                    div.style.textAlign = 'right';
+                } else {
+                    div.style.direction = 'ltr';
+                    div.style.textAlign = 'left';
+                }
+                
+                const textSpan = document.createElement('span');
+                textSpan.className = 'typing-text';
+                div.appendChild(textSpan);
+                const cursor = document.createElement('span');
+                cursor.className = 'typing-cursor';
+                div.appendChild(cursor);
+                
+                const cleaned = fullText.trim();
+                chatMessages.appendChild(div);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                typingElement = textSpan;
+                typingText = cleaned;
+                typingIndex = 0;
+                typingTimeoutIds = [];
+                
+                const speed = 10;
+                
+                function step() {
+                    if (!isTypingAnimation || typingIndex >= cleaned.length) {
+                        if (cursor && cursor.parentNode) cursor.parentNode.removeChild(cursor);
+                        textSpan.textContent = cleaned;
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                        
+                        stopButton.classList.add('hidden');
+                        sendButton.classList.remove('hidden');
+                        
+                        isTypingAnimation = false;
+                        isTyping = false;
+                        resolve();
+                        return;
+                    }
+                    
+                    textSpan.textContent = textSpan.textContent + cleaned.slice(typingIndex, typingIndex + 5);
+                    typingIndex += 5;
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    
+                    const timeoutId = setTimeout(step, speed);
+                    typingTimeoutIds.push(timeoutId);
+                }
+                
+                step();
+            });
+        }
+
+        // ✅ دالة إيقاف الكتابة
+        function stopTyping() {
+            if (isTypingAnimation) {
+                typingTimeoutIds.forEach(id => clearTimeout(id));
+                typingTimeoutIds = [];
+                
+                if (typingElement && typingText && typingIndex < typingText.length) {
+                    const remainingText = typingText.substring(typingIndex);
+                    typingElement.textContent += remainingText;
+                    
+                    const cursor = typingElement.parentElement.querySelector('.typing-cursor');
+                    if (cursor && cursor.parentNode) {
+                        cursor.parentNode.removeChild(cursor);
+                    }
+                }
+                
+                stopButton.classList.add('hidden');
+                sendButton.classList.remove('hidden');
+                
+                isTypingAnimation = false;
+                isTyping = false;
+            }
+            
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+            }
+        }
+
+        async function sendMessageToAI(userMessage) {
+            if (!fileContent) {
+                appendMessage('model', "Please upload and process a PDF file first.");
+                return;
+            }
+            appendMessage('user', userMessage);
+            chatHistory.push({ role: 'user', parts: [{ text: userMessage }] });
+            try {
+                abortController = new AbortController();
+                
+                const systemPrompt = `Document content:\n${fileContent}\n\nAnswer the following question. If the user's question is clearly a general knowledge question (e.g., "What is the capital of France?") and is NOT related to the document content, answer it directly as a helpful AI without mentioning the document. If the question relates to the document's subject matter (e.g., anatomy, glands, nerves), use the document content to answer. Be concise and educational.`;
+                
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+                const payload = {
+                    contents: [
+                        { role: 'user', parts: [{ text: systemPrompt }] },
+                        ...chatHistory
+                    ]
+                };
+                
+                const response = await geminiFetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...payload, generationConfig: GEN_CONFIG }),
+                    signal: abortController.signal
+                });
+                
+                const result = await response.json();
+                if (!response.ok || result.error) throw new Error(result?.error?.message || ('HTTP ' + response.status));
+                const aiResponse = result?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't generate a response.";
+                
+                await appendModelTyping(aiResponse);
+                chatHistory.push({ role: 'model', parts: [{ text: aiResponse }] });
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    console.log('Request was stopped by user');
+                } else {
+                    appendMessage('model', `Error: ${err.message}`);
+                    console.error(err);
+                }
+            } finally {
+                abortController = null;
+            }
+        }
+
+        sendButton.addEventListener('click', () => {
+            const message = chatInput.value.trim();
+            if (message) {
+                chatInput.value = '';
+                sendMessageToAI(message);
+            }
+        });
+
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const message = chatInput.value.trim();
+                if (message) {
+                    chatInput.value = '';
+                    sendMessageToAI(message);
+                }
+            }
+        });
+
+        stopButton.addEventListener('click', stopTyping);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isTypingAnimation) {
+                stopTyping();
+                e.preventDefault();
+            }
+        });
+
+        chatInput.addEventListener('input', () => {
+            if (isTypingAnimation) {
+                chatInput.focus();
+            }
+        });
+
+        chatInput.addEventListener('click', () => {
+            if (isTypingAnimation) {
+                chatInput.focus();
+            }
+        });
+
+        // UI events
+        taskSelect.addEventListener('change', e => {
+            mcqInputContainer.classList.toggle('hidden', e.target.value !== 'mcq');
+            saqInputContainer.classList.toggle('hidden', e.target.value !== 'saq');
+            comparisonInputContainer.classList.toggle('hidden', e.target.value !== 'comparison');
+        });
+        dropArea.addEventListener('click', () => fileInput.click());
+        dropArea.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropArea.classList.add('border-blue-500', 'bg-blue-50');
+        });
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('border-blue-500', 'bg-blue-50');
+        });
+        dropArea.addEventListener('drop', e => {
+            e.preventDefault();
+            dropArea.classList.remove('border-blue-500', 'bg-blue-50');
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', e => {
+            chatHistory = [];
+            chatMessages.innerHTML = '';
+            if (e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+        });
+        function handleFile(file) {
+            if (!file) return;
+            fileNameDisplay.textContent = `Selected File: ${file.name}`;
+            processPDF(file);
+        }
+        const pageFromInput = document.getElementById('page-from');
+        const pageToInput = document.getElementById('page-to');
+        const diffSelect = document.getElementById('difficulty-select');
+        let extractionPromise = null, currentPdf = null, textCache = {};
+        function showProgress(status, pct, info) {
+            ocrProgress.classList.remove('hidden');
+            ocrStatus.textContent = status;
+            ocrPageInfo.textContent = info || '';
+            if (pct == null) ocrProgressBar.classList.add('indeterminate');
+            else { ocrProgressBar.classList.remove('indeterminate'); ocrProgressBar.style.width = Math.max(2, Math.min(100, Math.round(pct))) + '%'; }
+        }
+        function hideProgress() { ocrProgress.classList.add('hidden'); ocrProgressBar.classList.remove('indeterminate'); }
+        function clampPages(input, fixOrder) {
+            if (!currentPdf) return;
+            const n = currentPdf.numPages;
+            if (input.value === '') return;
+            let v = parseInt(input.value, 10);
+            if (isNaN(v)) { input.value = ''; return; }
+            if (v > n) v = n;
+            if (v < 1 && fixOrder) v = 1;
+            if (v >= 1 || fixOrder) input.value = v;
+            if (fixOrder) {
+                const f = parseInt(pageFromInput.value, 10), t = parseInt(pageToInput.value, 10);
+                if (f && t && f > t) { if (input === pageFromInput) pageToInput.value = f; else pageFromInput.value = t; }
+            }
+        }
+        [pageFromInput, pageToInput].forEach(i => { i.addEventListener('input', () => clampPages(i, false)); i.addEventListener('change', () => clampPages(i, true)); });
+        function difficultyLine() {
+            const d = { easy: 'Difficulty: EASY - basic recall of the main facts and definitions.', medium: 'Difficulty: MEDIUM - understanding and applying the concepts.', hard: 'Difficulty: HARD - deep understanding, tricky distractors, analysis and clinical/real-world application.', mixed: 'Difficulty: MIXED - a balanced mix of easy, medium and hard.' };
+            return (d[diffSelect.value] || d.mixed) + '\n';
+        }
+        function processPDF(file) {
+            fileContent = ""; currentPdf = null; textCache = {};
+            extractionPromise = (async () => {
+                try {
+                    showProgress('Reading file...', null, file.name);
+                    const buffer = await new Promise((resolve, reject) => {
+                        const r = new FileReader();
+                        r.onload = () => resolve(r.result);
+                        r.onerror = () => reject(r.error || new Error('Could not read the file from the device'));
+                        r.readAsArrayBuffer(file);
+                    });
+                    showProgress('Opening PDF...', null, file.name);
+                    try { currentPdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer.slice(0)) }).promise; }
+                    catch (e1) { console.warn('PDF worker failed, retrying without worker', e1); currentPdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer.slice(0)), disableWorker: true }).promise; }
+                    const np = currentPdf.numPages;
+                    pageFromInput.value = ''; pageToInput.value = '';
+                    pageFromInput.min = pageToInput.min = 1; pageFromInput.max = pageToInput.max = np;
+                    pageFromInput.placeholder = '1'; pageToInput.placeholder = `last (${np})`;
+                    fileNameDisplay.textContent = `Selected File: ${file.name} — ${currentPdf.numPages} pages ✅`;
+                } catch (err) {
+                    console.error('PDF error:', err);
+                    currentPdf = null;
+                    fileNameDisplay.textContent = `Selected File: ${file.name} — ❌ ${err && err.message ? err.message : err}`;
+                } finally { hideProgress(); }
+            })();
+            return extractionPromise;
+        }
+        async function ensureText() {
+            await extractionPromise;
+            if (!currentPdf) throw new Error('Please upload a valid PDF first.');
+            const n = currentPdf.numPages;
+            const cmp = taskSelect.value === 'comparison';
+            const from = cmp ? 1 : (parseInt(pageFromInput.value, 10) || 1);
+            const to = cmp ? n : (parseInt(pageToInput.value, 10) || n);
+            if (from < 1 || to > n || from > to) throw new Error(`Invalid page range. This PDF has ${n} pages: use from 1 to ${n}.`);
+            const useOCR = useOcrCheckbox.checked, skip = skipIntroCheckbox.checked;
+            const key = [from, to, useOCR, skip].join('|');
+            if (textCache[key]) { fileContent = textCache[key]; return; }
+            let text = '';
+            const total = to - from + 1;
+            for (let i = from; i <= to; i++) {
+                showProgress(useOCR ? 'Reading text from images (OCR)...' : 'Extracting text...', ((i - from) / total) * 100, `Page ${i} (${i - from + 1} of ${total})`);
+                const page = await currentPdf.getPage(i);
+                text += (await extractTextFromPage(page, useOCR)) + '\n';
+            }
+            showProgress('Cleaning text...', 100, '');
+            if (skip) text = filterIrrelevantContent(text);
+            text = text.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+            hideProgress();
+            if (!text) throw new Error('No text found in these pages. If the PDF is scanned, tick the OCR option.');
+            textCache[key] = text; fileContent = text;
+        }
+        async function extractTextFromPage(page, useOCR) {
+            if (!useOCR) {
+                try {
+                    const content = await page.getTextContent();
+                    return content.items.map(item => item.str).join(' ');
+                } catch (error) {
+                    console.error("Error extracting text:", error);
+                    return "";
+                }
+            } else {
+                try {
+                    const viewport = page.getViewport({ scale: 2.0 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+                    const { data } = await Tesseract.recognize(canvas, 'eng', { logger: m => {} });
+                    return data.text;
+                } catch (error) {
+                    console.error("OCR error:", error);
+                    try {
+                        const content = await page.getTextContent();
+                        return content.items.map(item => item.str).join(' ');
+                    } catch (e) {
+                        return "";
+                    }
+                }
+            }
+        }
+        function filterIrrelevantContent(text) {
+            const lines = text.split('\n');
+            const filteredLines = [];
+            const irrelevantPatterns = [
+                /office hours?/i,
+                /prof(\.|essor)/i,
+                /lecturer/i,
+                /instructor/i,
+                /contact information/i,
+                /email/i,
+                /phone/i,
+                /@.*\./i,
+                /monday|tuesday|wednesday|thursday|friday|saturday|sunday/i,
+                /\d{1,2}[:.]\d{2}\s*(AM|PM)/i,
+                /academic hours/i,
+                /module coordinator/i,
+                /course outline/i,
+                /syllabus/i,
+                /schedule/i
+            ];
+            for (const line of lines) {
+                let isIrrelevant = irrelevantPatterns.some(p => p.test(line));
+                if (!isIrrelevant && line.trim().length > 10) {
+                    filteredLines.push(line);
+                }
+            }
+            return filteredLines.join('\n');
+        }
+        // ✅ PDF Download Logic
+        const { jsPDF } = window.jspdf;
+        downloadPdfBtn.addEventListener('click', async () => {
+            const resultDiv = document.getElementById('result-text');
+            if (!resultDiv.innerHTML.trim()) { alert("No summary to download."); return; }
+            const oldLabel = downloadPdfBtn.textContent;
+            downloadPdfBtn.disabled = true; downloadPdfBtn.textContent = 'Preparing PDF...';
+            try {
+                // Capture the real result element so the PDF keeps the exact look (headings, colors, bullets, tables, RTL)
+                const canvas = await html2canvas(resultDiv, {
+                    scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, windowWidth: 900,
+                    onclone: (doc) => {
+                        doc.body.classList.remove('dark');
+                        const el = doc.getElementById('result-text');
+                        el.style.padding = '24px'; el.style.background = '#ffffff'; el.style.color = '#0f172a'; el.style.width = '780px';
+                        const h = doc.createElement('h1'); h.textContent = 'Summary'; el.insertBefore(h, el.firstChild);
+                    }
+                });
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight(), mg = 10;
+                const imgW = pw - 2 * mg, pxPerMm = canvas.width / imgW, pagePx = Math.floor((ph - 2 * mg) * pxPerMm);
+                for (let y = 0, page = 0; y < canvas.height; y += pagePx, page++) {
+                    const h = Math.min(pagePx, canvas.height - y);
+                    const pc = document.createElement('canvas'); pc.width = canvas.width; pc.height = h;
+                    const ctx = pc.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, pc.width, h);
+                    ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+                    if (page) pdf.addPage();
+                    pdf.addImage(pc.toDataURL('image/jpeg', 0.95), 'JPEG', mg, mg, imgW, h / pxPerMm);
+                }
+                pdf.save('summary.pdf');
+            } catch (err) {
+                console.error("PDF generation failed:", err);
+                alert("Failed to generate PDF. Please try again in Chrome.");
+            } finally {
+                downloadPdfBtn.disabled = false; downloadPdfBtn.textContent = oldLabel;
+            }
+        });
+        processButton.addEventListener('click', async () => {
+            if (isProcessing) return;
+            isProcessing = true;
+            try { await ensureText(); }
+            catch (e) { hideProgress(); resultArea.classList.remove('hidden'); resultText.textContent = e.message; isProcessing = false; return; }
+            isProcessing = false;
+            
+            stopButton.classList.remove('hidden');
+            sendButton.classList.add('hidden');
+            
+            isProcessing = true;
+            loadingArea.classList.remove('hidden');
+            resultArea.classList.add('hidden');
+            resultText.textContent = "";
+            downloadPdfBtn.classList.add('hidden');
+            let prompt = "";
+            const selectedTask = taskSelect.value;
+            switch(selectedTask){
+                case 'summary': prompt = `Summarize the following text clearly in bullet points with headings where needed. Format in markdown using # for main headings, ## for subheadings, etc. Keep it concise but comprehensive. Do NOT use any code blocks or inline code.
+${fileContent}`; break;
+                case 'mcq':
+                    var mcqCount = mcqCountInput.value;
+                    const uniqueToken = '\n#unique:' + Date.now() + '-' + Math.floor(Math.random()*100000);
+                    prompt = `Generate exactly ${mcqCount} multiple-choice questions from the MAIN EDUCATIONAL CONTENT of the text below. Focus on the core educational material and ignore any introductory sections about professors, office hours, or administrative details. Provide them in this exact format without any extra text or introduction:
+Question: ...
+A) ...
+B) ...
+C) ...
+D) ...
+Correct Answer: X
+Do NOT include any extra options. Output exactly 4 options labeled A, B, C, D.
+Make each question phrased differently and randomize wording where possible. Avoid repeating exact questions that were generated previously for the same document.
+Text:
+${fileContent}${uniqueToken}`; 
+                    break;
+                case 'saq':
+                    var saqCount = saqCountInput.value;
+                    const saqUniqueToken = '\n#unique:' + Date.now() + '-' + Math.floor(Math.random()*100000);
+                    prompt = `Generate exactly ${saqCount} short answer questions from the MAIN EDUCATIONAL CONTENT of the text below. Focus on the core educational material and ignore any introductory sections about professors, office hours, or administrative details. Each question should be clear and concise, requiring a brief factual answer. Provide them in this exact format without any extra text or introduction:
+1. [Question]
+2. [Question]
+3. [Question]
+Do NOT provide answers. Only list the numbered questions.
+Text:
+${fileContent}${saqUniqueToken}`; 
+                    break;
+                case 'highlights': prompt = `Extract the key highlights as concise bullet points from the following:
+${fileContent}`; break;
+                case 'flashcards': prompt = `Generate 10 flashcards (Q/A) from the MAIN EDUCATIONAL CONTENT formatted as:
+Question: [Clear, direct question]
+Answer: [Concise, complete answer]
+Focus on the core educational material and ignore any introductory sections about professors, office hours, or administrative details.
+Format each flashcard as above, one per line. Do NOT use any other formatting like markdown headers or lists. Do NOT include numbers or bullets before questions or answers.
+Text:
+${fileContent}`; break;
+                case 'explanation-ar':
+                    prompt = `بص يا دكتور، الموضوع ده سهل وبسيط.
+اشرح المحتوى التالي باللهجة المصرية العامية (زي ما الدكتور بيشرح لطلابه في المحاضرة)، ركّز على الفهم وليس الحفظ. استخدم أمثلة واقعية لو محتاج، وابقَ ودود وسلس.  
+لما تشرح مصطلح أو فكرة، اكتبها بالعربي، وبعدين ضع بين قوسين المصطلح الإنجليزي الأصلي من النص (لو موجود)، واكتبه **بخط عريض فقط** باستخدام علامتي ** كدا:
+(شهيته مفتوحة – **increased appetite**)
+مثال:
+المريض: بيخس بسرعة رغم إنه بياكل كتير جداً (شهيته مفتوحة – **increased appetite**). جسمه بيحرق كل حاجة!
+لو في مقارنات (زي T3 vs T4)، أعمل جدول صغير يوضح الفرق بوضوح.
+ابدأ الشرح دايمًا بجملة: "بص يا دكتور، الموضوع ده سهل وبسيط."
+المحتوى:
+${fileContent}`;
+                    break;
+                case 'comparison':
+                    const termsRaw = comparisonTermsInput.value.trim();
+                    if (!termsRaw) {
+                        loadingArea.classList.add('hidden');
+                        resultArea.classList.remove('hidden');
+                        resultText.textContent = "Please enter the concepts you want to compare, separated by 'vs' or a comma.";
+                        isProcessing = false;
+                        return;
+                    }
+                    const terms = termsRaw.split(/\s*vs\s*|\s*,\s*|\s+and\s+/i).map(t => t.trim()).filter(t => t);
+                    const conceptA = terms[0] || 'Concept 1';
+                    const conceptB = terms[1] || 'Concept 2';
+                    
+                    prompt = `Based ONLY on the following document, generate a detailed comparison table between "${conceptA}" and "${conceptB}".
+                    The table MUST be formatted in Markdown. It must have three columns: "Property", "${conceptA}", and "${conceptB}" and the output MUST be entirely in English.
+                    
+                    Document:
+                    ${fileContent}`;
+                    break;
+            }
+            if (['mcq','saq','flashcards'].includes(selectedTask)) prompt = difficultyLine() + prompt;
+            showProgress('Sending to Gemini...', null, 'Waiting for the first words');
+            try {
+                if (!['mcq','saq','flashcards'].includes(selectedTask)) {
+                    // Streaming: text appears while Gemini is still writing
+                    const sUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
+                    const resp = await geminiFetch(sUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contents:[{ role:'user', parts:[{ text: prompt }] }], generationConfig: GEN_CONFIG }) });
+                    if (!resp.ok) { const j = await resp.json().catch(() => ({})); throw new Error(j?.error?.message || ('HTTP ' + resp.status)); }
+                    const renderStreamed = (txt) => {
+                        if (selectedTask === 'explanation-ar') {
+                            const clean = txt.replace(/^#{1,6}\s*/gm, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '$1').replace(/\n{3,}/g, '\n\n');
+                            resultText.innerHTML = `<div class="explanation-ar-content">${clean}</div>`;
+                        } else if (selectedTask === 'comparison') {
+                            resultText.innerHTML = marked.parse(txt).replace(/<table/i, '<table class="comparison-table"');
+                        } else {
+                            resultText.innerHTML = marked.parse(txt);
+                        }
+                    };
+                    const reader = resp.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buf = '', full = '', shown = false, lastRender = 0;
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buf += decoder.decode(value, { stream: true });
+                        let nl;
+                        while ((nl = buf.indexOf('\n')) >= 0) {
+                            const line = buf.slice(0, nl).trim();
+                            buf = buf.slice(nl + 1);
+                            if (!line.startsWith('data:')) continue;
+                            const d = line.slice(5).trim();
+                            if (!d || d === '[DONE]') continue;
+                            try {
+                                const j = JSON.parse(d);
+                                const t = (j.candidates?.[0]?.content?.parts || []).map(x => x.text || '').join('');
+                                if (t) {
+                                    full += t;
+                                    if (!shown) { shown = true; loadingArea.classList.add('hidden'); resultArea.classList.remove('hidden'); }
+                                    if (Date.now() - lastRender > 250) { renderStreamed(full); lastRender = Date.now(); showProgress('Writing...', null, full.split(/\s+/).length + ' words'); }
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                    if (full) { renderStreamed(full); chatContainer.classList.remove('hidden'); onTextResult(full); }
+                    else resultText.textContent = "No content generated.";
+                } else {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+                const payload = { contents: [{ role: 'user', parts: [{ text: prompt }] }] };
+                const response = await geminiFetch(apiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ...payload, generationConfig: GEN_CONFIG }) });
+                const result = await response.json();
+                if (!response.ok || result.error) throw new Error(result?.error?.message || ('HTTP ' + response.status));
+                const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (generatedText){
+                    let htmlContent = generatedText;
+                    if(selectedTask==='mcq') renderMCQ(generatedText);
+                    else if(selectedTask==='saq') renderSAQ(generatedText);
+                    else if(selectedTask==='flashcards') renderFlashcards(generatedText);
+                    else if(selectedTask === 'explanation-ar') {
+                        let cleanText = generatedText
+                            .replace(/^#{1,6}\s*/gm, '')
+                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\*(.*?)\*/g, '$1')
+                            .replace(/\n{3,}/g, '\n\n');
+                        resultText.innerHTML = `<div class="explanation-ar-content">${cleanText}</div>`;
+                    } else if (selectedTask === 'comparison') { 
+                        let htmlContent = marked.parse(generatedText);
+                        htmlContent = htmlContent.replace(/<table/i, '<table class="comparison-table"');
+                        resultText.innerHTML = htmlContent;
+                    } else {
+                        htmlContent = marked.parse(generatedText);
+                        resultText.innerHTML = htmlContent;
+                    }
+                    chatContainer.classList.remove('hidden');
+                } else resultText.textContent = "No content generated. " + (result?.promptFeedback?.blockReason || result?.candidates?.[0]?.finishReason || "");
+                }
+            } catch(err){
+                resultText.textContent = `Error: ${err.message}`;
+                console.error(err);
+            } finally {
+                loadingArea.classList.add('hidden');
+                hideProgress();
+                resultArea.classList.remove('hidden');
+                
+                stopButton.classList.add('hidden');
+                sendButton.classList.remove('hidden');
+                
+                if (taskSelect.value === 'summary' && resultText.innerHTML.trim()) {
+                    downloadPdfBtn.classList.remove('hidden');
+                }
+                isProcessing = false;
+            }
+        });
+        
+        // ===== Interactive MCQ quiz =====
+        function parseMCQ(text) {
+            const clean = t => t.replace(/\*\*/g, '').trim();
+            const out = [];
+            text.split(/(?:^|\n)\s*\**Question\s*\d*\s*[:.]\**\s*/i).filter(b => b.trim()).forEach(block => {
+                const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+                const stem = [], opts = {};
+                lines.forEach(l => {
+                    const o = clean(l).match(/^([A-D])[\).:]\s*(.+)$/i);
+                    const c = clean(l).match(/^Correct\s*Answer\s*[:\-]?\s*\(?([A-D])/i);
+                    if (c) return;
+                    if (o) opts[o[1].toUpperCase()] = o[2].trim();
+                    else if (!Object.keys(opts).length) stem.push(clean(l));
+                });
+                const cm = clean(block).match(/Correct\s*Answer\s*[:\-]?\s*\(?([A-D])/i);
+                const letters = Object.keys(opts).sort();
+                if (!cm || letters.length < 2 || !opts[cm[1].toUpperCase()]) return;
+                out.push({ stem: stem.join(' '), letters, opts, correct: cm[1].toUpperCase() });
+            });
+            return out;
+        }
+        let quiz = null;
+        function renderMCQ(text) {
+            const qs = parseMCQ(text);
+            if (!qs.length) { resultText.textContent = text; return; }
+            startQuiz(qs, qs);
+        }
+        function startQuiz(qs, all) { quiz = { qs, all, i: 0, answers: [] }; drawQuiz(); }
+        function el(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+        function drawQuiz() {
+            const n = quiz.qs.length, q = quiz.qs[quiz.i];
+            const score = quiz.answers.filter(a => a.ok).length;
+            resultText.innerHTML = '';
+            const wrap = el('div', 'quiz');
+            const head = el('div', 'quiz-head'); head.append(el('span', '', `Question ${quiz.i + 1} of ${n}`), el('span', '', `Score: ${score}`));
+            const bar = el('div', 'quiz-bar'); const fill = el('div'); fill.style.width = (quiz.i / n * 100) + '%'; bar.append(fill);
+            const qe = el('p', 'quiz-q', q.stem); qe.dir = 'auto';
+            wrap.append(head, bar, qe);
+            const next = el('button', 'beautiful-btn btn-primary mt-3 hidden', quiz.i + 1 < n ? 'Next ➜' : 'See results 🏁'); next.style.width = '100%';
+            const btns = q.letters.map(L => {
+                const b = el('button', 'quiz-opt', `${L}) ${q.opts[L]}`); b.dir = 'auto'; b.type = 'button';
+                b.addEventListener('click', () => {
+                    if (quiz.answers[quiz.i]) return;
+                    const ok = L === q.correct;
+                    quiz.answers[quiz.i] = { pick: L, ok };
+                    btns.forEach((x, k) => { x.disabled = true; if (q.letters[k] === q.correct) x.classList.add('correct'); });
+                    if (!ok) b.classList.add('wrong');
+                    next.classList.remove('hidden');
+                });
+                wrap.append(b); return b;
+            });
+            next.addEventListener('click', () => { quiz.i++; quiz.i < n ? drawQuiz() : quizResults(); });
+            wrap.append(next); resultText.append(wrap);
+        }
+        function quizResults() {
+            const n = quiz.qs.length, score = quiz.answers.filter(a => a.ok).length, pct = Math.round(score / n * 100);
+            resultText.innerHTML = '';
+            const wrap = el('div', 'quiz');
+            wrap.append(el('div', 'quiz-score', `${score} / ${n}  (${pct}%)`), el('p', 'text-center', pct >= 80 ? '🌟 Excellent!' : pct >= 50 ? '👍 Good, keep reviewing.' : '📚 Needs more review.'));
+            const wrongs = [];
+            quiz.qs.forEach((q, i) => {
+                const a = quiz.answers[i]; if (a && a.ok) return; wrongs.push(q);
+                const box = el('div', 'quiz-wrong');
+                const t = el('p', 'font-bold', `${i + 1}. ${q.stem}`); t.dir = 'auto';
+                const y = el('p', '', a ? `❌ Your answer: ${a.pick}) ${q.opts[a.pick]}` : '❌ Not answered'); y.dir = 'auto'; y.style.color = '#dc2626';
+                const c = el('p', '', `✅ Correct: ${q.correct}) ${q.opts[q.correct]}`); c.dir = 'auto'; c.style.color = '#16a34a';
+                const ex = el('button', 'beautiful-btn btn-success mt-2', '💡 Explain'); ex.type = 'button';
+                ex.addEventListener('click', () => { ex.disabled = true; explainQuestion(q.stem, q.opts, `${q.correct}) ${q.opts[q.correct]}`, box); });
+                box.append(t, y, c, ex); wrap.append(box);
+            });
+            const row = el('div', 'fc-row');
+            if (wrongs.length) { const r = el('button', 'beautiful-btn btn-primary', `Retry ${wrongs.length} wrong`); r.addEventListener('click', () => startQuiz(wrongs, quiz.all)); row.append(r); }
+            const all = el('button', 'beautiful-btn btn-success', 'Restart all'); all.addEventListener('click', () => startQuiz(quiz.all, quiz.all)); row.append(all);
+            wrap.append(row); resultText.append(wrap);
+        }
+        
+        function renderSAQ(text){
+            resultText.innerHTML="";
+            const blocks = text.split(/\n\s*\d+\.\s*/).filter(b=>b.trim());
+            blocks.forEach((block, index) => {
+                const div = document.createElement('div');
+                div.classList.add('saq-question');
+                const question = block.split('\n')[0].trim();
+                const qEl = document.createElement('p');
+                qEl.classList.add('font-bold','mb-2');
+                qEl.textContent = `Q${index + 1}: ${question}`;
+                div.appendChild(qEl);
+                const answerBtn = document.createElement("button");
+                answerBtn.classList.add("saq-answer-btn");
+                answerBtn.textContent = "Answer";
+                answerBtn.addEventListener("click", async () => {
+                    answerBtn.disabled = true;
+                    answerBtn.textContent = "Loading...";
+                    try {
+                        const prompt = `Based on this document, provide a clear and concise answer to this short-answer question:
+Question: ${question}
+Answer in plain text without markdown or formatting. Use no more than 40 words.
+Document:
+${fileContent}`;
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+                        const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                        const response = await geminiFetch(apiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ...payload, generationConfig: GEN_CONFIG }) });
+                        const result = await response.json();
+                if (!response.ok || result.error) throw new Error(result?.error?.message || ('HTTP ' + response.status));
+                        const gen = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        const answerDiv = document.createElement('div');
+                        answerDiv.classList.add('saq-answer');
+                        answerDiv.textContent = gen ? gen : 'No answer generated.';
+                        div.appendChild(answerDiv);
+                    } catch(e) {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.classList.add('saq-answer');
+                        errorDiv.classList.add('text-red-600');
+                        errorDiv.textContent = `Error: ${e.message}`;
+                        div.appendChild(errorDiv);
+                    }
+                });
+                div.appendChild(answerBtn);
+                resultText.appendChild(div);
+            });
+        }
+        // ===== Flip flashcards =====
+        function parseCards(text) {
+            const clean = t => t.replace(/\*\*/g, '').trim();
+            const out = []; const re = /Question:\s*([\s\S]*?)\s*Answer:\s*([\s\S]*?)(?=\n\s*\**Question:|\s*$)/gi; let m;
+            while ((m = re.exec(text))) { const q = clean(m[1]), a = clean(m[2]); if (q && a) out.push({ q, a }); }
+            return out;
+        }
+        let deck = null;
+        function renderFlashcards(text) {
+            const cards = parseCards(text);
+            if (!cards.length) { resultText.textContent = text; return; }
+            startDeck(cards, cards);
+        }
+        function startDeck(queue, all) { deck = { queue, all, i: 0, known: 0, review: [] }; drawCard(); }
+        function drawCard() {
+            const n = deck.queue.length;
+            if (deck.i >= n) return deckDone();
+            const c = deck.queue[deck.i];
+            resultText.innerHTML = '';
+            const wrap = el('div', 'quiz');
+            const head = el('div', 'quiz-head'); head.append(el('span', '', `Card ${deck.i + 1} of ${n}`), el('span', '', `Known ${deck.known}  ·  Review ${deck.review.length}`));
+            const bar = el('div', 'quiz-bar'); const fill = el('div'); fill.style.width = (deck.i / n * 100) + '%'; bar.append(fill);
+            const scene = el('div', 'fc-scene'); const inn = el('div', 'fc-in');
+            const f = el('div', 'fc-f', c.q), b = el('div', 'fc-b', c.a); f.dir = b.dir = 'auto';
+            inn.append(f, b); scene.append(inn);
+            const hint = el('p', 'text-center text-sm', 'Tap the card to flip'); hint.style.opacity = '.6';
+            const row = el('div', 'fc-row hidden');
+            const rev = el('button', 'beautiful-btn btn-danger', 'Need review'), know = el('button', 'beautiful-btn btn-success', '✅ I know it');
+            rev.type = know.type = 'button';
+            scene.addEventListener('click', () => { scene.classList.toggle('flipped'); row.classList.remove('hidden'); });
+            rev.addEventListener('click', () => { deck.review.push(c); deck.i++; drawCard(); });
+            know.addEventListener('click', () => { deck.known++; deck.i++; drawCard(); });
+            row.append(rev, know); wrap.append(head, bar, scene, hint, row); resultText.append(wrap);
+        }
+        function deckDone() {
+            resultText.innerHTML = '';
+            const wrap = el('div', 'quiz'); const n = deck.queue.length;
+            wrap.append(el('div', 'quiz-score', `${deck.known} / ${n} known`), el('p', 'text-center', deck.review.length ? `${deck.review.length} card(s) need review.` : '🎉 You know them all!'));
+            const row = el('div', 'fc-row');
+            if (deck.review.length) { const r = el('button', 'beautiful-btn btn-primary', `Review ${deck.review.length} card(s)`); r.addEventListener('click', () => startDeck(deck.review, deck.all)); row.append(r); }
+            const all = el('button', 'beautiful-btn btn-success', 'Restart all'); all.addEventListener('click', () => startDeck(deck.all, deck.all)); row.append(all);
+            wrap.append(row); resultText.append(wrap);
+        }
+        
+        async function explainQuestion(questionText, options, correctAnswerText, div) {
+            const prompt = `Based on the document content, explain why "${correctAnswerText}" is the correct answer for this question:
+            
+Question: ${questionText}
+
+Provide a brief explanation (2-3 sentences) focusing on the educational content from the lecture. Answer in plain text only.`;
+
+            let explanation = div.querySelector(".explanation-block");
+            if (!explanation) { 
+                explanation = document.createElement("div"); 
+                explanation.classList.add("explanation-block", "text-blue-700", "mt-3", "p-3", "bg-blue-50", "rounded"); 
+                div.appendChild(explanation); 
+            }
+            explanation.innerHTML = "";
+            
+            try {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+                const payload = { 
+                    contents: [{ 
+                        parts: [{ 
+                            text: `Document content:\n${fileContent}\n\n${prompt}` 
+                        }] 
+                    }] 
+                };
+                
+                explanation.textContent = "⏳ Generating explanation from lecture content...";
+                const response = await geminiFetch(apiUrl, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ ...payload, generationConfig: GEN_CONFIG }) 
+                });
+                const result = await response.json();
+                if (!response.ok || result.error) throw new Error(result?.error?.message || ('HTTP ' + response.status));
+                const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text || 'No explanation available.';
+                
+                await typeIntoElement(explanation, generatedText, 25);
+            } catch(e) { 
+                explanation.textContent = `Error generating explanation: ${e.message}`; 
+            }
+        }
+        
+        explainButton.addEventListener('click', async () => {
+            const termRaw = explanationInput.value.trim();
+            if (!termRaw || isProcessing) return;
+            isProcessing = true;
+            explanationStatus.classList.remove('hidden');
+            explanationResult.classList.remove('hidden');
+            explanationText.textContent = '';
+            const termUpper = termRaw.toUpperCase();
+            const isAcronymLike = /^[A-Z]{2,6}$/.test(termUpper);
+            if (isAcronymLike && expansions[termUpper]) {
+                const full = toTitleCase(expansions[termUpper]);
+                explanationText.innerHTML = `<div class="expansion-highlight">${full} (${termUpper})</div>`;
+            } else {
+                explanationText.innerHTML = `<div class="expansion-highlight">${termRaw}</div>`;
+            }
+            try {
+                const prompt = `Using the provided document for context (if available), produce a VERY SHORT plain-text explanation for the term "${termRaw}".
+Requirements:
+- Output plain text only (no markdown).
+- Start with a clear definition in one sentence (this will be shown as the highlighted main point).
+- Follow with up to 2 very brief bullet points (if needed) — each bullet short.
+- Keep the entire explanation under 50 words.
+- If the term is an acronym, also provide the full expansion (Full Name) in parentheses after the definition.
+Document:
+${fileContent || "[No document provided]"}`;
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+                const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                const response = await geminiFetch(apiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ...payload, generationConfig: GEN_CONFIG }) });
+                const result = await response.json();
+                if (!response.ok || result.error) throw new Error(result?.error?.message || ('HTTP ' + response.status));
+                const gen = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                explanationStatus.classList.add('hidden');
+                const cleaned = cleanModelText(gen);
+                let highlightLine = null;
+                let restLines = [];
+                if (isAcronymLike && expansions[termUpper]) {
+                    highlightLine = `${toTitleCase(expansions[termUpper])} (${termUpper})`;
+                    const lines = cleaned.split('\n').map(l=>l.trim()).filter(Boolean);
+                    for (const ln of lines) {
+                        const simpleLn = ln.replace(/\s+/g,' ').toLowerCase();
+                        const expSimple = expansions[termUpper].replace(/\s+/g,' ').toLowerCase();
+                        if (simpleLn.includes(expSimple) || simpleLn.includes(termUpper.toLowerCase())) continue;
+                        else restLines.push(ln);
+                    }
+                } else {
+                    const lines = cleaned.split('\n').map(l=>l.trim()).filter(Boolean);
+                    if (lines.length > 0) {
+                        highlightLine = lines[0];
+                        restLines = lines.slice(1);
+                    } else {
+                        highlightLine = cleaned;
+                        restLines = [];
+                    }
+                }
+                let html = `<div class="expansion-highlight">${highlightLine}</div>`;
+                if (restLines.length > 0) {
+                    html += `<ul class="explanation-key-points">`;
+                    for (let i=0; i<Math.min(2, restLines.length); i++){
+                        html += `<li>${restLines[i]}</li>`;
+                    }
+                    html += `</ul>`;
+                }
+                explanationText.innerHTML = html;
+            } catch (e) {
+                explanationStatus.classList.add('hidden');
+                explanationText.textContent = `Error: ${e?.message || e}`;
+            } finally {
+                isProcessing = false;
+            }
+        });
+        // Make jsPDF global
+        window.jsPDF = window.jspdf.jsPDF;
+    </script>
+    <button id="settings-btn" aria-label="Settings" style="position:fixed;bottom:14px;right:14px;z-index:50;width:46px;height:46px;border-radius:50%;border:none;background:#1f8a4c;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer">⚙️</button>
+    <div id="settings-modal" class="hidden"><div class="modal-card">
+        <h3 style="font-weight:800;font-size:1.15rem">Settings</h3>
+        <label for="set-model">AI model</label>
+        <select id="set-model" class="w-full beautiful-input">
+            <option value="gemini-3.5-flash-lite">Flash-Lite - fastest</option>
+            <option value="gemini-3.5-flash">Flash - more accurate</option>
+            <option value="gemini-3.8-flash">3.8 Flash - newest, slower</option>
+        </select>
+        <label for="set-thinking">Thinking level</label>
+        <select id="set-thinking" class="w-full beautiful-input">
+            <option value="minimal">Minimal - fastest (Flash-Lite only)</option>
+            <option value="low">Low - balanced</option>
+            <option value="medium">Medium - more careful, slower</option>
+        </select>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="set-dark"/> Dark mode 🌙</label>
+        <button id="set-key" class="w-full beautiful-btn btn-primary" style="margin-top:14px">🔑 Change API key</button>
+        <button id="set-close" class="w-full beautiful-btn btn-success" style="margin-top:8px">Done</button>
+    </div></div>
+    <script>
+        function applyTheme() {
+            document.body.classList.toggle('dark', !!S.dark);
+            const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', S.dark ? '#0b1220' : '#1f8a4c');
+        }
+        applyTheme();
+        const setModal = document.getElementById('settings-modal'), setModel = document.getElementById('set-model'), setThink = document.getElementById('set-thinking'), setDark = document.getElementById('set-dark');
+        function openSettings() { setModel.value = S.model; setThink.value = S.thinking; setDark.checked = !!S.dark; setModal.classList.remove('hidden'); }
+        document.getElementById('settings-btn').addEventListener('click', openSettings);
+        document.getElementById('set-close').addEventListener('click', () => setModal.classList.add('hidden'));
+        setModal.addEventListener('click', e => { if (e.target === setModal) setModal.classList.add('hidden'); });
+        setModel.addEventListener('change', () => { S.model = setModel.value; GEMINI_MODEL = S.model; saveSettings(); });
+        setThink.addEventListener('change', () => { S.thinking = setThink.value; saveSettings(); });
+        setDark.addEventListener('change', () => { S.dark = setDark.checked; saveSettings(); applyTheme(); });
+        document.getElementById('set-key').addEventListener('click', () => askForApiKey("Paste your Gemini API key (AIza...). It is saved only on this device:"));
+
+        // difficulty only for question tasks
+        const diffBox = document.getElementById('diff-container');
+        function syncDiff() {
+            const t = taskSelect.value, cmp = t === 'comparison';
+            diffBox.classList.toggle('hidden', !['mcq', 'saq', 'flashcards'].includes(t));
+            document.getElementById('from-box').classList.toggle('hidden', cmp);
+            document.getElementById('to-box').classList.toggle('hidden', cmp);
+            document.getElementById('opts-row').classList.toggle('hidden', cmp);
+        }
+        taskSelect.addEventListener('change', syncDiff); syncDiff();
+
+        // translate (Arabic <-> English)
+        const translateRow = document.getElementById('translate-row'), translateBtn = document.getElementById('translate-btn');
+        let srcText = '', origHtml = '', transHtml = '', transTarget = '', showingTrans = false;
+        processButton.addEventListener('click', () => { translateRow.classList.add('hidden'); resultText.style.direction = ''; });
+        function onTextResult(text) {
+            srcText = text; origHtml = resultText.innerHTML; transHtml = ''; showingTrans = false;
+            transTarget = isArabicText(text) ? 'English' : 'Arabic';
+            translateBtn.textContent = `🌐 Translate to ${transTarget}`; translateBtn.disabled = false;
+            translateRow.classList.remove('hidden');
+        }
+        translateBtn.addEventListener('click', async () => {
+            if (showingTrans) { resultText.innerHTML = origHtml; resultText.style.direction = ''; showingTrans = false; translateBtn.textContent = `🌐 Translate to ${transTarget}`; return; }
+            if (!transHtml) {
+                translateBtn.disabled = true; translateBtn.textContent = '⏳ Translating...';
+                try {
+                    const prompt = `Translate the following content to ${transTarget}. Preserve the markdown formatting exactly (headings, bullets, tables, bold). ${transTarget === 'Arabic' ? 'Keep important English medical/technical terms in parentheses after the Arabic word.' : ''} Output only the translation.\n\n${srcText}`;
+                    const r = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }) });
+                    const j = await r.json();
+                    if (!r.ok || j.error) throw new Error(j?.error?.message || ('HTTP ' + r.status));
+                    const t = j?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('');
+                    if (!t) throw new Error('Empty translation');
+                    transHtml = marked.parse(t);
+                } catch (e) { translateBtn.disabled = false; translateBtn.textContent = `🌐 Translate to ${transTarget}`; alert('Translation failed: ' + e.message); return; }
+                translateBtn.disabled = false;
+            }
+            resultText.innerHTML = transHtml; resultText.style.direction = transTarget === 'Arabic' ? 'rtl' : 'ltr'; showingTrans = true;
+            translateBtn.textContent = '↩ Show original';
+        });
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js').catch(err => console.warn('SW failed', err));
+            });
+        }
+    </script>
+</body>
+</html>

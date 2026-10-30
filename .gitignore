@@ -1,0 +1,14 @@
+# Desktop (Electron) files - not needed on GitHub Pages
+node_modules/
+release/
+dist/
+main.js
+preload.js
+renderer.js
+package.json
+package-lock.json
+
+# Never commit keys
+.env
+*.key
+secrets.*
